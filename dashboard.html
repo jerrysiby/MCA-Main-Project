@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Video Streaming Platform</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #6c63ff;
+            --secondary-color: #ff6584;
+            --gradient-start: #4facfe;
+            --gradient-end: #00f2fe;
+            --text-color: #333;
+            --light-color: #fff;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+        }
+        body {
+            background: linear-gradient(135deg, #f0f8ff, #e6e6fa);
+            font-family: 'Poppins', sans-serif;
+        }
+        .dashboard-header {
+            background: linear-gradient(90deg, var(--gradient-start), var(--gradient-end));
+            color: var(--light-color);
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .offense-badge {
+            background-color: var(--warning-color);
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+        .alert {
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        .alert-warning { background-color: #fff3e0; color: var(--warning-color); }
+        .alert-success { background-color: #e6ffe6; color: #28a745; }
+        .alert-error { background-color: #ffe6e6; color: var(--danger-color); }
+        .temp-block-container {
+            background: rgba(255, 245, 238, 0.9);
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+        .timer-bar {
+            height: 20px;
+            background: #ddd;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .timer-progress {
+            height: 100%;
+            background: var(--gradient-start);
+            transition: width 1s linear, background-color 0.3s;
+        }
+        .video-section, .comments-section {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        .btn-primary {
+            background: var(--primary-color);
+            border: none;
+            transition: transform 0.2s;
+        }
+        .btn-primary:hover {
+            transform: scale(1.05);
+            background: var(--secondary-color);
+        }
+        .comment-item {
+            background: #f8f9fa;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            transition: transform 0.2s;
+        }
+        .comment-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+        }
+        footer {
+            background: var(--primary-color);
+            color: var(--light-color);
+            padding: 1rem;
+            text-align: center;
+            border-radius: 10px 10px 0 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container my-4">
+        <header class="dashboard-header">
+            <h1 class="display-5 fw-bold">Video Streaming Platform</h1>
+            <div class="user-info">
+                <span class="fs-5">Welcome, {{ username }}</span>
+                {% if offense_count > 0 %}
+                <span class="offense-badge">Warning {{ offense_count }}/2</span>
+                {% endif %}
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-light">Logout</a>
+            </div>
+        </header>
+        
+        <main class="dashboard-main mt-4">
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert {% if '⚠️' in message %}alert-warning{% elif 'success' in message.lower() %}alert-success{% else %}alert-error{% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            {% if temp_block_info %}
+                <div class="temp-block-container">
+                    <h2 class="text-warning">⚠️ Temporary Comment Restriction</h2>
+                    <p>You posted content that violated our guidelines.</p>
+                    <div class="timer-container">
+                        <div class="timer-bar">
+                            <div class="timer-progress" id="block-timer-progress"></div>
+                        </div>
+                        <div class="timer-text mt-2">
+                            Block expires in: <span id="minutes">{{ temp_block_info.minutes }}</span>:<span id="seconds">{{ temp_block_info.seconds }}</span>
+                        </div>
+                    </div>
+                    <p class="mt-3">
+                        <strong>Warning:</strong> Offense {{ offense_count }}/2. One more offense will result in permanent deactivation.
+                    </p>
+                </div>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        let totalSeconds = {{ temp_block_info.total_seconds }};
+                        let minutes = {{ temp_block_info.minutes }};
+                        let seconds = {{ temp_block_info.seconds }};
+                        const timerProgress = document.getElementById('block-timer-progress');
+                        const minutesDisplay = document.getElementById('minutes');
+                        const secondsDisplay = document.getElementById('seconds');
+                        secondsDisplay.textContent = seconds < 10 ? '0' + seconds : seconds;
+                        const timer = setInterval(() => {
+                            totalSeconds--;
+                            minutes = Math.floor(totalSeconds / 60);
+                            seconds = totalSeconds % 60;
+                            minutesDisplay.textContent = minutes;
+                            secondsDisplay.textContent = seconds < 10 ? '0' + seconds : seconds;
+                            const percentLeft = (totalSeconds / {{ temp_block_info.total_seconds }}) * 100;
+                            timerProgress.style.width = `${percentLeft}%`;
+                            if (totalSeconds <= 10) timerProgress.style.backgroundColor = '#e74c3c';
+                            else if (totalSeconds <= 30) timerProgress.style.backgroundColor = '#e67e22';
+                            if (totalSeconds <= 0) {
+                                clearInterval(timer);
+                                window.location.reload();
+                            }
+                        }, 1000);
+                    });
+                </script>
+            {% endif %}
+            
+            <div class="row dashboard-grid">
+                <div class="col-md-6 mb-4">
+                    <div class="video-section">
+                        <h2 class="text-primary">Featured Video</h2>
+                        <div class="video-container">
+                            <video controls class="w-100 rounded shadow">
+                                <source src="{{ url_for('static', filename='video.mp4') }}" type="video/mp4">
+                                Your browser does not support the video tag.
+                            </video>
+                            <a href="{{ url_for('stream_video') }}" class="btn btn-secondary mt-2">View Full Page</a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 mb-4">
+                    <div class="comments-section">
+                        <h2 class="text-primary">Comments</h2>
+                        <div class="add-comment mb-3">
+                            <form action="{{ url_for('comment') }}" method="POST">
+                                <div class="form-group mb-2">
+                                    <textarea name="comment" class="form-control" placeholder="Add your comment..." required {% if temp_block_info %}disabled{% endif %}></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100" {% if temp_block_info %}disabled{% endif %}>Post Comment</button>
+                            </form>
+                        </div>
+                        <div class="comments-list">
+                            {% if comments %}
+                                {% for comment in comments %}
+                                    <div class="comment-item">
+                                        <div class="comment-header d-flex justify-content-between">
+                                            <span class="fw-bold text-primary">{{ comment.username }}</span>
+                                            <span class="text-muted small">
+                                                {{ comment.timestamp.split('T')[0] }} {{ comment.timestamp.split('T')[1].split('.')[0] }}
+                                            </span>
+                                        </div>
+                                        <div class="comment-body mt-1">{{ comment.comment }}</div>
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="text-muted">No comments yet. Be the first!</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <footer class="mt-4">
+            <p>&copy; 2025 Video Streaming Platform</p>
+        </footer>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
