@@ -27,7 +27,7 @@ VIDEO_PATH = 'static/video.mp4'
 
 # Email configuration
 EMAIL_SENDER = 'jerrinsiby01@gmail.com'
-EMAIL_PASSWORD = 'your_app_password_here'  # Replace with your Gmail App Password
+EMAIL_PASSWORD = 'yeif jbac sfvg htem'  # Replace with your Gmail App Password
 SMTP_SERVER = 'smtp.gmail.com'
 SMTP_PORT = 587
 
@@ -68,7 +68,7 @@ def get_username(email):
 
 def is_user_blocked(email):
     try:
-        with open(BLOCKED_USERS_FILE, 'r', encoding='utf-8-sig') as file:  # Use utf-8-sig to handle BOM
+        with open(BLOCKED_USERS_FILE, 'r', encoding='utf-8-sig') as file:
             reader = csv.DictReader(file)
             if 'email' not in reader.fieldnames:
                 return False
@@ -237,12 +237,23 @@ def stream_video():
 
 def is_offensive_comment(comment):
     try:
-        translation_input = translator_tokenizer(comment, return_tensors="pt", padding=True, truncation=True)
-        translated_output = translator_model.generate(**translation_input)
-        translated_text = translator_tokenizer.decode(translated_output[0], skip_special_tokens=True)
-        inputs = classification_tokenizer(translated_text, return_tensors="tf", padding=True, truncation=True)
+        # Check if comment is in Malayalam script (Unicode range 0x0D00–0x0D7F)
+        is_malayalam = any(ord(char) >= 0x0D00 and ord(char) <= 0x0D7F for char in comment)
+        
+        if is_malayalam:
+            # Translate Malayalam to English
+            translation_input = translator_tokenizer(comment, return_tensors="pt", padding=True, truncation=True)
+            translated_output = translator_model.generate(**translation_input)
+            translated_text = translator_tokenizer.decode(translated_output[0], skip_special_tokens=True)
+            text_to_classify = translated_text
+        else:
+            # Manglish or English, skip translation
+            text_to_classify = comment
+
+        # Classify with trained DistilBERT
+        inputs = classification_tokenizer(text_to_classify, return_tensors="tf", padding=True, truncation=True)
         predictions = classification_model(inputs).logits
-        return bool(tf.argmax(predictions, axis=1).numpy()[0] == 1)
+        return bool(tf.argmax(predictions, axis=1).numpy()[0] == 1)  # 1 = offensive
     except Exception as e:
         print(f"Error in offensive comment detection: {e}")
         import random
@@ -339,7 +350,7 @@ def comment():
     flash("Comment added successfully")
     return redirect(url_for('dashboard'))
 
-# API endpoints (unchanged for brevity, apply similar encoding fixes if needed)
+# API endpoints
 @app.route('/api/register', methods=['POST'])
 def api_register():
     data = request.get_json()
